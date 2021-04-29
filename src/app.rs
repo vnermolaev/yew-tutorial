@@ -1,14 +1,23 @@
+use crate::fetch::{get_ip_info, HostIPResponse};
+use anyhow::Error;
 use rand::Rng;
+use yew::format::Json;
+use yew::services::fetch::FetchTask;
+use yew::services::ConsoleService;
 use yew::{html, Component, ComponentLink, Html, ShouldRender};
 
 pub struct Model {
     items: Vec<i64>,
     link: ComponentLink<Self>,
+    ip: Option<String>,
+    task: Option<FetchTask>,
 }
 
 pub enum Msg {
     AddOne,
     RemoveOne,
+    GetIpResponse,
+    IpResponseReady(Result<HostIPResponse, Error>),
 }
 
 impl Component for Model {
@@ -19,6 +28,8 @@ impl Component for Model {
         Model {
             items: Vec::new(),
             link,
+            ip: None,
+            task: None,
         }
     }
 
@@ -26,9 +37,29 @@ impl Component for Model {
         let mut rng = rand::thread_rng();
 
         match msg {
-            Msg::AddOne => self.items.push(rng.gen_range(1..=6)),
+            Msg::AddOne => {
+                let item = rng.gen_range(1..=6);
+                ConsoleService::debug(format!("Adding {}", item).as_str());
+                self.items.push(item);
+            }
             Msg::RemoveOne => {
-                self.items.pop();
+                if let Some(item) = self.items.pop() {
+                    ConsoleService::debug(format!("Removing {}", item).as_str());
+                } else {
+                    ConsoleService::error("List is empty");
+                }
+            }
+
+            Msg::GetIpResponse => {
+                self.task = Some(get_ip_info(self.link.callback(Msg::IpResponseReady)));
+            }
+
+            Msg::IpResponseReady(Ok(r)) => {
+                self.ip = Some(r.ip.clone());
+                ConsoleService::info(format!("Response: {:?}", Json(r)).as_str());
+            }
+            Msg::IpResponseReady(Err(err)) => {
+                ConsoleService::error(format!("Error: {:?}", err).as_str());
             }
         }
 
@@ -44,6 +75,8 @@ impl Component for Model {
 
         html! {
             <div class="main">
+                <h1>{ format!("{:?}", self.ip ) }</h1>
+                <button onclick=self.link.callback(|_| Msg::GetIpResponse)>{ "Get IP" }</button>
                 <div class="card">
                     <header>
                         {"Items: "}
