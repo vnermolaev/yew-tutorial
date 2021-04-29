@@ -1,11 +1,57 @@
-#!/bin/sh
+#!/usr/bin/env sh
+
+BUILD_DIR=build
+WASM_DIR=$BUILD_DIR/wasm
+APP_DIR=$BUILD_DIR/app
+JS_DIR=$BUILD_DIR/js
+WASM_NAME=wasm
+
+help() {
+  echo "Run this script to get a dev-env"
+}
+
+clean() {
+  rm -f $WASM_DIR/*
+  rm -f $JS_DIR/*
+}
+
+create_version() {
+  echo "Timestamping..."
+  datetime=$(date +"%d.%m.%Y %T")
+  cat > ./build/js/version.js << EOL
+// Do not modify; created programmatically
+export function __compiled() {
+    return "${datetime}"
+}
+EOL
+}
+
+wasm() {
+  echo "Building WASM..."
+  wasm-pack build --target web --out-name $WASM_NAME --out-dir $WASM_DIR
+}
 
 build() {
-  wasm-pack build --target web --out-name wasm --out-dir ./static
+  clean
+  create_version
+  wasm
+  pack
+}
+
+
+
+pack() {
+  echo "Copying wasm-files..."
+  cp "$WASM_DIR/$WASM_NAME.js" "$APP_DIR/$WASM_NAME.js"
+  cp "$WASM_DIR/$WASM_NAME""_bg.wasm" "$APP_DIR/$WASM_NAME""_bg.wasm"
+
+  echo "Packing..."
+  cd $BUILD_DIR || echo "Cannot change to $BUILD_DIR"
+  rollup -c
 }
 
 start() {
-  python3 -m http.server -d ./static 8080 &
+  python3 -m http.server -d $APP_DIR 8080 &
   PID=$!
   echo $PID > .serverpid
 }
@@ -20,5 +66,41 @@ stop(){
     fi
 }
 
-$1
 
+#run(){
+#  thttp -p 8080 &
+#    PID=$!
+#    echo $PID > .serverpid
+#}
+
+#watch() {
+#  cargo watch -w ./src --ignore "*.js" --postpone -s "run.sh --reload"
+#}
+#
+#stop() {
+#  kill $(cat .serverpid)
+#  rm .serverpid
+#}
+#
+#while [ "$1" != "" ]; do
+#    case $1 in
+#        -r | --reload )         stop
+#                                build
+#                                run
+#                                exit
+#                                ;;
+#        -h | --help )           help
+#                                exit
+#                                ;;
+#    esac
+#    shift
+#done
+#
+#
+#if [ -f .serverpid ]; then
+#    echo "Server already running, or in an inconsistent state"
+#    exit 1
+#fi
+
+#build && pack && run && watch
+$1

@@ -3,3 +3,6 @@ Cargo.lock
 
 /.idea
 .serverpid
+
+/build/*
+!/build/app/index.html
